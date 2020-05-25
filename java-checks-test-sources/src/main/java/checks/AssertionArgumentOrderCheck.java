@@ -1,11 +1,13 @@
 package checks;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.withinPercentage;
 import static org.junit.Assert.*;
 class AssertionArgumentOrderCheck {
   static final String CONSTANT = "";
-  void fun() {
+  void junit() {
     assertEquals(0, new AssertionArgumentOrderCheck().actual());
-    assertEquals(new AssertionArgumentOrderCheck().actual(), 0); // Noncompliant [[sc=62;ec=63;secondary=8]]
+    assertEquals(new AssertionArgumentOrderCheck().actual(), 0); // Noncompliant [[sc=62;ec=63;secondary=10]]
     assertEquals("message", new AssertionArgumentOrderCheck().actual(), 0); // Noncompliant
     assertEquals("message", 0, new AssertionArgumentOrderCheck().actual());
     assertEquals("message", "constantString", actualObject());
@@ -32,6 +34,18 @@ class AssertionArgumentOrderCheck {
     assertEquals("message", actualObject(), CONSTANT); // Noncompliant
     assertEquals("message", actualObject(), AssertionArgumentOrderCheck.CONSTANT); // Noncompliant
     assertEquals("message", AssertionArgumentOrderCheck.CONSTANT, actualObject());
+  }
+
+  void assertJ() {
+    assertThat(new AssertionArgumentOrderCheck().actual()).isEqualTo(0);
+    assertThat(0).isEqualTo(new AssertionArgumentOrderCheck().actual()); // Noncompliant [[sc=16;ec=17]] {{Swap this expected value with the actual value.}}
+    assertThat(actualObject()).isEqualTo("constantString");
+    assertThat("constantString").isEqualTo(actualObject()); // Noncompliant
+    assertThat(0).isLessThanOrEqualTo(actualObject()); // Noncompliant
+    assertThat("constantString").as("message").isEqualTo(actualObject()); // Noncompliant
+    assertThat(0.1).isCloseTo(actualObject(), withinPercentage(11)); // Noncompliant
+    assertThat(actualObject()).isEqualTo(CONSTANT);
+    assertThat(CONSTANT).isEqualTo(actualObject()); // Noncompliant
   }
 
   int actual() {

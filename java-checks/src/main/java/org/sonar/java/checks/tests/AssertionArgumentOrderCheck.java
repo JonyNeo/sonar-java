@@ -41,7 +41,9 @@ public class AssertionArgumentOrderCheck extends AbstractMethodDetection {
   private static final String ORG_JUNIT5_ASSERTIONS = "org.junit.jupiter.api.Assertions";
   private static final Tree.Kind[] LITERAL_KINDS = {Tree.Kind.STRING_LITERAL, Tree.Kind.INT_LITERAL, Tree.Kind.LONG_LITERAL, Tree.Kind.CHAR_LITERAL,
     Tree.Kind.NULL_LITERAL, Tree.Kind.BOOLEAN_LITERAL, Tree.Kind.DOUBLE_LITERAL, Tree.Kind.FLOAT_LITERAL};
-  private static final String MESSAGE = "Swap these 2 arguments so they are in the correct order: expected value, actual value.";
+
+  private static final String MESSAGE_SWAP = "Swap this expected value with the actual value.";
+  private static final String MESSAGE_SWAP_2_ARGUMENTS = "Swap these 2 arguments so they are in the correct order: expected value, actual value.";
 
   private static final MethodMatchers COLLECTION_CREATION_CALL = MethodMatchers.or(
     MethodMatchers.create()
@@ -62,6 +64,11 @@ public class AssertionArgumentOrderCheck extends AbstractMethodDetection {
       MethodMatchers.create().ofTypes(ORG_JUNIT5_ASSERTIONS)
         .names("assertArrayEquals", "assertEquals", "assertIterableEquals", "assertLinesMatch", "assertNotEquals", "assertNotSame", "assertSame")
         .withAnyParameters()
+        .build(),
+      // AssertJ
+      MethodMatchers.create().ofTypes("org.assertj.core.api.Assertions")
+        .names("assertThat")
+        .addParametersMatcher(MethodMatchers.ANY)
         .build()
     );
   }
@@ -70,17 +77,30 @@ public class AssertionArgumentOrderCheck extends AbstractMethodDetection {
   protected void onMethodInvocationFound(MethodInvocationTree mit) {
     if (mit.symbol().owner().type().is(ORG_JUNIT5_ASSERTIONS)) {
       checkArguments(mit.arguments().get(0), mit.arguments().get(1));
-    } else {
+    } else if (mit.symbol().owner().type().is(ORG_JUNIT_ASSERT)) {
       ExpressionTree argToCheck = getActualArgument(mit);
       checkArguments(previousArg(argToCheck, mit), argToCheck);
+    } else {
+      // AssertJ
+      checkArgument(mit.arguments().get(0));
     }
   }
 
   private void checkArguments(Tree expectedArgument, ExpressionTree actualArgument) {
-    if (isConstant(actualArgument) || isNewArrayWithConstants(actualArgument) || isCollectionCreationWithConstants(actualArgument)) {
+    if (isExpectedPattern(actualArgument)) {
       List<JavaFileScannerContext.Location> secondaries = Collections.singletonList(new JavaFileScannerContext.Location("", expectedArgument));
-      context.reportIssue(this, actualArgument, MESSAGE, secondaries, null);
+      context.reportIssue(this, actualArgument, MESSAGE_SWAP_2_ARGUMENTS, secondaries, null);
     }
+  }
+
+  private void checkArgument(ExpressionTree actualArgument) {
+    if (isExpectedPattern(actualArgument)) {
+      reportIssue(actualArgument, MESSAGE_SWAP);
+    }
+  }
+
+  private static boolean isExpectedPattern(ExpressionTree actualArgument) {
+    return isConstant(actualArgument) || isNewArrayWithConstants(actualArgument) || isCollectionCreationWithConstants(actualArgument);
   }
 
   private static boolean isNewArrayWithConstants(ExpressionTree actualArgument) {
